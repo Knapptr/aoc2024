@@ -46,7 +46,7 @@ class Equation{
             // put result into numms and run again
             const updatedNums = [result,...nums.slice(2)];
             // console.log(lhs,curOp,rhs,'=',result, {updatedNums});
-            if(this.checkPossible(operations,updatedNums)){return true;}
+            if(result <= this.result && this.checkPossible(operations,updatedNums)){return true;}
             
         }
         return false
