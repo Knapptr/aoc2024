@@ -1,3 +1,4 @@
+import parseGrid2D from "./helpers/parseGrid2D";
 import {readInput} from "./readInput";
 
 
@@ -33,17 +34,15 @@ const cellFromChar = (char:string):[Cell,MapDirection] =>{
 const parseMap = (input:string):Map=>{
     let guardCoords:Coords = [-1,-1];
     let guardDirection:GuardDir = "UP";
-    const cells = input.trim().split("\n").map((row,rowI)=>{
-        return row.split("").map((char,cellI)=>{
-            const coords:Coords = [rowI,cellI];
-            const [mapCell,guardDir] = cellFromChar(char);
+    const cells = parseGrid2D(input,(char,rowI,charI)=>{
+const [mapCell,guardDir] = cellFromChar(char);
+            const coords:Coords = [rowI,charI];
             if (mapCell.type === "GUARD") {
                 guardCoords = coords;
                 guardDirection = guardDir!;
             };
             return mapCell;
-        })
-    });
+    })
     return {cells,guardCoords,guardDirection};
     }
 
