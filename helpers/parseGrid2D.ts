@@ -3,7 +3,7 @@
 const parseGrid2D = <T>(input:string, factory: (char:string,lineI:number,charI:number)=>T):T[][] =>{
     return input.trim().split("\n").map((line,lineI)=>{
         return line.split("").map((char,charI)=>{
-            return factory(char,lineI,charI)
+            return factory(char,lineI,charI);
         })
     })
 }
