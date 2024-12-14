@@ -33,19 +33,19 @@ const parseMachineString = (input:string): [number,number] => {
     return  [x,y];
 }
 
-const parsePrizeString = (input:string): Coord =>{
+const parsePrizeString = (input:string,offset:number = 0): Coord =>{
     const [_,coordS] = input.split(":").map(s=>s.trim());
     const [xS,yS] = coordS.split(",").map(s=>s.trim()) // "X+65", "Y+11"
-    const x = parseInt(xS.slice(2));
-    const y = parseInt(yS.slice(2));
+    const x = parseInt(xS.slice(2)) + offset;
+    const y = parseInt(yS.slice(2)) + offset;
     return [x,y];
 }
-const parse = (input:string): Machine[]=>{
+const parse = (input:string, offset:number= 0): Machine[]=>{
     return input.trim().split("\n\n").map(mString => {
        const [aS,bS,pS] = mString.split("\n");
         const a = createA(...parseMachineString(aS));
         const b = createB(...parseMachineString(bS));
-        const prize = parsePrizeString(pS);
+        const prize = parsePrizeString(pS, offset);
 
         return {a,b,prize}
     })
@@ -54,46 +54,47 @@ const parse = (input:string): Machine[]=>{
 const move = (coord:Coord,delta: Coord): Coord =>{
     return [coord[0] + delta[0], coord[1] + delta[1]]
 }
-const tryMoves = (coord:Coord,machine:Machine,costAcc: number[] = [],currentCost:number = 0): boolean => {
-    console.log({coord});
-    // base case fail
-    if(coord[0] > machine.prize[0] || coord[1] > machine.prize[1]){return false}
-    // base case success
-    if (coord[0] === machine.prize[0] && coord[1] === machine.prize[1]){
-        return true
+/* MATH ZONE
+n = number of machine b
+n = (py * ax) - (ay * px)
+    ---------------------
+    by * ax - by * ay
+*/
+const findCheapestWin  = (machine:Machine): number =>{
+    const a = machine.a;
+    const b = machine.b;
+    const [pX, pY] = machine.prize;
+
+    const n = Math.floor(((pY * a.x) - (a.y * pX)) /( (b.y * a.x) - (b.x * a.y)));
+    const m = Math.floor((pX - b.x * n ) / a.x);
+
+    // check that adds to coords
+    if ((a.x * m + b.x * n === pX) && (a.y * m + b.y * n === pY)){
+        return a.cost * m + b.cost * n
+    }else{
+        return -1
     }
-    // try A
-    const afterA = move(coord,[machine.a.x,machine.a.y]);
-    
-    if(tryMoves(afterA,machine,costAcc,currentCost + machine.a.cost)){
-        costAcc.push(currentCost + machine.a.cost)
-    }
-    // try B
-    const afterB = move(coord,[machine.b.x,machine.b.y]);
-    
-    if(tryMoves(afterB,machine,costAcc,currentCost + machine.b.cost)){
-        costAcc.push(currentCost + machine.b.cost)
-    }
-    return false // this should be unreachable
-     
 }
-const p1BruteForce = (machines:Machine[]):number => {
-    const costs = []
+const solve = (machines:Machine[]):number => {
+    const costs = [];
     for (const machine of machines){
-        const machineCosts: number[] = [];
-        tryMoves([0,0], machine, machineCosts);
-        if(machineCosts.length > 0){
-            costs.push(Math.min(...machineCosts));
+       const cheapest = findCheapestWin(machine) ;
+        if (cheapest !== -1){
+            costs.push(cheapest);
         }
     }
-    return costs.reduce((acc,cv)=> cv + acc);
+    return costs.reduce((acc,c)=> acc + c, 0);
 }
 
+
 const main = async ()=>{
-    const input = await readInput("./inputs/13.test.txt");
+    const input = await readInput("./inputs/13.txt");
     const machines = parse(input);
-    const p1 = p1BruteForce(machines);
+    const p1 = solve(machines);
     console.log({p1});
+    const machines2 = parse(input,10000000000000);
+    const p2 = solve(machines2);
+    console.log({p2});
 }
 
 main();
