@@ -14,7 +14,7 @@ interface Machine {
     operate():boolean
 }
 
-const initMachine = (registerA:number,registerB:number,registerC:number,code:number[]):Machine =>{
+const initMachine = (registerA:number,registerB:number,registerC:number,code:number[],instructionPointer:number = 0):Machine =>{
     return {
         registerA,
         registerB,
@@ -48,6 +48,7 @@ const initMachine = (registerA:number,registerB:number,registerC:number,code:num
             }
         }
     }
+    
 }
 
 const readComboOperand = (op:number,machine:Machine):number=> {
@@ -101,6 +102,7 @@ const bxc = (machine: Machine):void =>{
 /** OPCODE 5 */
 const out = (machine:Machine):void =>{
     const op = readComboOperand(machine.getOperand(),machine);
+    // console.log("\t",{outputting: op % 8, atPoint: machine.instructionPointer});
     machine.output.push(op % 8);
     machine.advancePointer();
 }
@@ -132,18 +134,88 @@ const machineFromInput = (input:string):Machine =>{
     return initMachine(rA,rB,rC,code);
 }
 
+const cloneMachine = (machine:Machine):Machine =>{
+    return {
+        ...machine,
+        output: [...machine.output],
+        code: [...machine.code]
+
+    }
+}
+
 const p1 = (input: string):string=>{
     const machine = machineFromInput(input);
     while(machine.operate()){
-        // console.log({machine})
     };
     return machine.output.join();
     }
 
+const p2 = (input: string):number=>{
+    const MAXTEST = 99999999;
+    const MINTEST = 9999999;
+    let machine = machineFromInput(input);
+    const initMachine = cloneMachine(machine);
+    const desiredOut = [...machine.code];
+    // Test initial place and get numbers that work until there
+    const workingNumbers = new Set<number>;
+    for(let i = MAXTEST; i>MINTEST; i --){
+        console.log(i);
+        machine = cloneMachine(initMachine);
+        machine.registerA = i
+        
+    while(machine.operate()){
+        // break when outputting one, and compare
+        if(machine.output.length === 1 && machine.output.at(-1) === desiredOut[0]){
+            workingNumbers.add(i);
+            break;
+        }
+        }
+    }
+
+    // Initial numbers have been calculated, move through to next places
+
+    for(let testCount = 1; testCount < desiredOut.length; testCount ++){
+        console.log(testCount, "........................");
+        for(const viableNumber of workingNumbers.keys()){
+            machine = cloneMachine(initMachine);
+            machine.registerA = viableNumber;
+            while(machine.operate()){
+            // break when outputting one, and compare
+
+            if(machine.output.length === testCount + 1 && machine.output.at(-1) !== desiredOut[testCount]){
+                workingNumbers.delete(viableNumber);
+                break;
+                }
+            }
+            if(machine.output.length < testCount + 1){workingNumbers.delete(viableNumber)};
+        }
+    }
+
+    // Get the lowest value in workingnumbers
+    console.log({workingNumbers});
+    const numbers = [...workingNumbers.values()].filter(n=> n > 7);
+    console.log({ numbers })
+    return Math.min(...numbers);
+    };
+
 const main = async () => {
     const  input = await readInput("./inputs/17.txt");
-    const r1 = p1(input);
-    console.log({part1: r1});
+    // const r1 = p1(input);
+    // console.log({part1: r1});
+    // const r2 = p2(input);
+    // console.log({p2:r2});
+    for (let i =  8; i < 32768; i ++){
+        let machine = machineFromInput(input);
+        const savedMachine = cloneMachine(machine);
+        machine.registerA = i;
+        while(machine.operate()){
+            if(machine.output[0] === 2 && machine.output[1] === 4 && machine.output[2] ===1 && machine.output[3] === 7 ){ console.log(i)}
+        }
+        machine = cloneMachine(savedMachine);
+
+        
+        
+    }
 }
 
 
