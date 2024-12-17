@@ -18,7 +18,7 @@ const cloneDeer = (deer:Reindeer):Reindeer => {
         direction: deer.direction,
         coords: [...deer.coords],
         score: deer.score,
-        path: [...deer.path]
+        path: [...deer.path],
     }
 }
 
@@ -90,8 +90,13 @@ const priorityEnqueue = (cheapestQueue:DQueue, deer:Reindeer) =>{
     cheapestQueue.sort((a,b)=> b.score - a.score);
 }
 
-const dijkstra = (maze:string[][],deer:Reindeer,distanceTracker: number[][],seenTracker: Set<string>):void =>{
+const vectorId = (deer:Reindeer):string=>{
+return `${coordToString(deer.coords)}-${deer.direction}`;
+}
+const dijkstra = (maze:string[][],deer:Reindeer,distanceTracker: number[][],seenTracker: Set<string>):Reindeer[] =>{
     const queue:DQueue= [deer]; // Priority queue, done lazily here
+    let successfulPaths:Reindeer[] = [];
+    let lowestScore = Infinity;
 
     while(queue.length > 0){
         const currentDeer = queue.pop()!;
@@ -106,17 +111,31 @@ const dijkstra = (maze:string[][],deer:Reindeer,distanceTracker: number[][],seen
     const allNbors = [forwardDeer,leftDeer,rightDeer,backDeer];
     for (const nbor of allNbors){
         // console.log({nbor});
-        if(getAtCoords(maze,nbor.coords) !== "#"){
+        const atCell = getAtCoords(maze,nbor.coords);
+        if(atCell!=="#"){
             setCoordMin(distanceTracker,nbor.coords,nbor.score);
+            if(atCell === "E"){
+                if(nbor.score === lowestScore){
+                    const successfulDeer = cloneDeer(nbor);
+                    successfulDeer.path.push(coordToString(nbor.coords))
+                    successfulPaths.push(successfulDeer);
+                }
+                if(nbor.score < lowestScore){
+                    lowestScore = nbor.score;
+                    successfulPaths = [nbor]
+                }            }
         }
         // add unseen coords to pQueue
-        if(!seenTracker.has(coordToString(nbor.coords)) && getAtCoords(maze,nbor.coords) !== "#"){
+        if(!seenTracker.has(vectorId(nbor)) && getAtCoords(maze,nbor.coords) !== "#"){
             priorityEnqueue(queue,nbor);
         }
     }
-        seenTracker.add(coordToString(currentDeer.coords));
+        seenTracker.add(vectorId(currentDeer));
     }
+    return successfulPaths
 }
+
+
 
 const one = (input:string):number => {
     const [maze,deerCoords,endCoords] = parseMaze(input);
@@ -143,49 +162,21 @@ const two = (input:string):number => {
     // set start distance to 0
     distanceArray[deerCoords[0]][deerCoords[1]] = 0;
     // Visit shortest
-    dijkstra(maze,deer,distanceArray,seen);
-    //bfs the distances?
-    // Walk from end to start, always decreasing value
-    const cells = [];
-    let queue = [endCoords];
-    const visited = new Set;
-while (queue.length > 0){
-    let currentCoords = queue[0];
-    visited.add(coordToString(currentCoords));
-    queue = queue.slice(1);
-    let lowestMoves:Coord[] = [];
-    let lowestCost = Infinity;
-    for (const [dY,dX] of Object.values(moveDeltas)){
-        const targetCoords:Coord = [currentCoords[0] + dY,currentCoords[1] + dX];
-        const cost = distanceArray[targetCoords[0]][targetCoords[1]];
-        console.log({cost});
-        if(cost === lowestCost){
-            lowestMoves.push([...targetCoords]);
-        }
-        if(cost < lowestCost){
-            lowestMoves = [[...targetCoords]];
-            lowestCost = cost;
-        }
-        
-    }
-    if(getAtCoords(maze,currentCoords) !== "S"){
-    queue = [...lowestMoves, ...queue];
-    }
-    cells.push(...lowestMoves);
+    let successfulDeer = dijkstra(maze,deer,distanceArray,seen);
+    const uniqSeats = new Set(successfulDeer.map(d=>d.path).flat());
+
+
+    return uniqSeats.size
 }
     
-const uniqCells = new Set(cells.map(c=>coordToString(c)));
-console.log(distanceArray);
-    return -1 
-}
 
 
 const main = async () =>{
-    const input = await readInput("./inputs/16.test.txt");
-    // let res = one(input);
-    // console.log({res});
+    const input = await readInput("./inputs/16.txt");
+    let p1 = one(input);
+    console.log({p1});
     let p2 = two(input);
-    console.log(JSON.stringify(p2,null,2));
+    console.log({p2});
 
 }
 
