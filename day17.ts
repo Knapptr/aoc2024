@@ -1,32 +1,35 @@
+import { writeFile } from "fs";
 import {readInput} from "./readInput";
 
 interface Machine {
-    registerA: number;
-    registerB: number;
-    registerC: number;
+    registerA: bigint;
+    registerB: bigint;
+    registerC: bigint;
     code: number[]
     output:  number[];
     instructionPointer: number;
     readPointer():number;
     getOperand():number;
-    advancePointer():void
+    advancePointer():void;
+    history: { opcode:number, operand:number, registerA:bigint,registerB:bigint,registerC:bigint}[]
         /** returns  true if operation success, false if not*/
     operate():boolean
 }
 
-const initMachine = (registerA:number,registerB:number,registerC:number,code:number[],instructionPointer:number = 0):Machine =>{
+const initMachine = (registerA:bigint,registerB:bigint,registerC:bigint,code:number[],instructionPointer:number = 0):Machine =>{
     return {
         registerA,
         registerB,
         registerC,
         code,
         output: [],
+        history: [],
         instructionPointer: 0,
         readPointer(){
-            return this.code[this.instructionPointer]
+            return this.code[this.instructionPointer];
         },
         getOperand() {
-            return this.code[this.instructionPointer + 1]
+            return this.code[this.instructionPointer + 1];
         },
         advancePointer() {
             this.instructionPointer += 2
@@ -34,6 +37,8 @@ const initMachine = (registerA:number,registerB:number,registerC:number,code:num
         operate(){
             if(this.instructionPointer >= code.length){return false}
             const currentOperation = this.readPointer();
+
+            this.history.push({registerA:this.registerA,registerB:this.registerB,registerC:this.registerC, opcode: currentOperation, operand: this.getOperand()})
 
             switch (currentOperation){
                 case 0: adv(this); return true;
@@ -51,8 +56,8 @@ const initMachine = (registerA:number,registerB:number,registerC:number,code:num
     
 }
 
-const readComboOperand = (op:number,machine:Machine):number=> {
-    if(op < 4) {return op}
+const readComboOperand = (op:number,machine:Machine):bigint=> {
+    if(op < 4) {return BigInt(op)}
     switch (op){
         case 4: return machine.registerA;
         case 5: return machine.registerB;
@@ -65,15 +70,15 @@ const readComboOperand = (op:number,machine:Machine):number=> {
 /** OPCODE 0 */
 const adv = (machine:Machine):void =>{
    const num = machine.registerA; 
-   const denom = Math.pow(2,readComboOperand(machine.getOperand(),machine));
-    const result = Math.floor(num / denom);
-    machine.registerA = result;
+   const denom= BigInt(Math.pow(2,Number(readComboOperand(machine.getOperand(),machine))));
+    const result = BigInt(Math.floor(Number(num / denom)));
+    machine.registerA = BigInt(result);
     machine.advancePointer() 
 }
 
 /** OPCODE 1 */
 const bxl = (machine:Machine):void =>{
- const result = machine.registerB ^ machine.getOperand()
+ const result = machine.registerB ^ BigInt(machine.getOperand())
     machine.registerB = result;
     machine.advancePointer()
 }
@@ -81,13 +86,13 @@ const bxl = (machine:Machine):void =>{
 /** OPCODE 2 */
 const bst = (machine: Machine):void => {
     const op = readComboOperand(machine.getOperand(),machine);
-    machine.registerB = op % 8;
+    machine.registerB = op % BigInt(8);
     machine.advancePointer();
 }
 
 /** OPCODE 3 */
 const jnz = (machine: Machine):void =>{
-    if(machine.registerA === 0){
+    if(Number(machine.registerA) === 0){
         machine.advancePointer();
         return;}
     machine.instructionPointer = machine.getOperand()
@@ -103,33 +108,33 @@ const bxc = (machine: Machine):void =>{
 const out = (machine:Machine):void =>{
     const op = readComboOperand(machine.getOperand(),machine);
     // console.log("\t",{outputting: op % 8, atPoint: machine.instructionPointer});
-    machine.output.push(op % 8);
+    machine.output.push(Number(op) % 8);
     machine.advancePointer();
 }
 
 /** OPCODE 6 */
 const bdv = (machine:Machine):void =>{
    const num = machine.registerA; 
-   const denom = Math.pow(2,readComboOperand(machine.getOperand(),machine));
-    const result = Math.floor(num / denom);
-    machine.registerB = result;
+   const denom = Math.pow(2,Number(readComboOperand(machine.getOperand(),machine)));
+    const result = Math.floor(Number(num) / denom);
+    machine.registerB = BigInt(result);
     machine.advancePointer() 
 }
 
 /** OPCODE 7 */
 const cdv = (machine:Machine):void =>{
-   const num = machine.registerA; 
-   const denom = Math.pow(2,readComboOperand(machine.getOperand(),machine));
+   const num = Number(machine.registerA);
+   const denom = Math.pow(2,Number(readComboOperand(machine.getOperand(),machine)));
     const result = Math.floor(num / denom);
-    machine.registerC = result;
+    machine.registerC = BigInt(result);
     machine.advancePointer() 
 }
 
 const machineFromInput = (input:string):Machine =>{
     const lines  = input.trim().split("\n");
-    const rA = parseInt(lines[0].split(":")[1].trim());
-    const rB = parseInt(lines[1].split(":")[1].trim());
-    const rC = parseInt(lines[2].split(":")[1].trim());
+    const rA = BigInt(parseInt(lines[0].split(":")[1].trim()));
+    const rB = BigInt(parseInt(lines[1].split(":")[1].trim()));
+    const rC = BigInt(parseInt(lines[2].split(":")[1].trim()));
     const code = lines[4].split(":")[1].trim().split(",").map(c=>parseInt(c));
     return initMachine(rA,rB,rC,code);
 }
@@ -150,72 +155,58 @@ const p1 = (input: string):string=>{
     return machine.output.join();
     }
 
-const p2 = (input: string):number=>{
-    const MAXTEST = 99999999;
-    const MINTEST = 9999999;
+const investigate = (input:string ):number =>{
     let machine = machineFromInput(input);
-    const initMachine = cloneMachine(machine);
-    const desiredOut = [...machine.code];
-    // Test initial place and get numbers that work until there
-    const workingNumbers = new Set<number>;
-    for(let i = MAXTEST; i>MINTEST; i --){
-        console.log(i);
-        machine = cloneMachine(initMachine);
-        machine.registerA = i
-        
-    while(machine.operate()){
-        // break when outputting one, and compare
-        if(machine.output.length === 1 && machine.output.at(-1) === desiredOut[0]){
-            workingNumbers.add(i);
-            break;
-        }
-        }
-    }
-
-    // Initial numbers have been calculated, move through to next places
-
-    for(let testCount = 1; testCount < desiredOut.length; testCount ++){
-        console.log(testCount, "........................");
-        for(const viableNumber of workingNumbers.keys()){
-            machine = cloneMachine(initMachine);
-            machine.registerA = viableNumber;
-            while(machine.operate()){
-            // break when outputting one, and compare
-
-            if(machine.output.length === testCount + 1 && machine.output.at(-1) !== desiredOut[testCount]){
-                workingNumbers.delete(viableNumber);
-                break;
+    const desired = [2,4,1,7,7,5,4,1,1,4,5,5,0,3,3];
+    const originalMachine = cloneMachine(machine);
+    machine.registerA = BigInt(3); // 3 outputs a 0
+    let last_success = [3];
+    for (let d = -1; d > -16; d--){
+            let currentSuccesses = [];
+        for (let i = 0; i <= 8; i++){
+            for(const potential of [...last_success]){
+                let currentValue = (potential * 8) + i;
+               machine = cloneMachine(originalMachine);
+                machine.registerA = (BigInt(currentValue));
+                console.log("running for length", d * -1 );
+            while(machine.output.length < 1){
+                machine.operate();
                 }
-            }
-            if(machine.output.length < testCount + 1){workingNumbers.delete(viableNumber)};
+            if(machine.output.at(0) === desired.at(d)){
+                currentSuccesses.push(currentValue);
+                console.log({last_success});
+            console.log(machine.output);
+        }
         }
     }
-
-    // Get the lowest value in workingnumbers
-    console.log({workingNumbers});
-    const numbers = [...workingNumbers.values()].filter(n=> n > 7);
-    console.log({ numbers })
-    return Math.min(...numbers);
-    };
+    console.log(currentSuccesses);
+            last_success = [...currentSuccesses];
+            currentSuccesses = [];
+        }
+    return last_success.sort()[0];
+}
 
 const main = async () => {
     const  input = await readInput("./inputs/17.txt");
-    // const r1 = p1(input);
-    // console.log({part1: r1});
+    // let p2 = investigate(input);
+    // console.log({p2});
+    const r1 = p1(input);
+    console.log({part1: r1});
+
     // const r2 = p2(input);
     // console.log({p2:r2});
-    for (let i =  8; i < 32768; i ++){
-        let machine = machineFromInput(input);
-        const savedMachine = cloneMachine(machine);
-        machine.registerA = i;
-        while(machine.operate()){
-            if(machine.output[0] === 2 && machine.output[1] === 4 && machine.output[2] ===1 && machine.output[3] === 7 ){ console.log(i)}
-        }
-        machine = cloneMachine(savedMachine);
+    // for (let i =  8; i < 32768; i ++){
+    //     let machine = machineFromInput(input);
+    //     const savedMachine = cloneMachine(machine);
+    //     machine.registerA = i;
+    //     while(machine.operate()){
+    //         if(machine.output[0] === 2 && machine.output[1] === 4 && machine.output[2] ===1 && machine.output[3] === 7 ){ console.log(i)}
+    //     }
+    //     machine = cloneMachine(savedMachine);
 
         
         
-    }
+    // }
 }
 
 
