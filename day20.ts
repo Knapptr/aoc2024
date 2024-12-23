@@ -67,6 +67,7 @@ const cloneCoords = (coords:Coord):Coord =>{
     return [...coords];
 }
 
+/** kept running in to stack overflow problems with the recursive DFS. Because there is only a single path, this can be solved iteratively */
 const iterativeRoute = (map:CellMap): Coord[] =>{
      let currentCell = map.atCoords(map.startCoords);
     const route = [currentCell.coords];
@@ -103,61 +104,91 @@ const stringToCoords=(coordString:string):Coord=>{
     return [y,x];
 }
 
+
+const tryShortcuts = (map:CellMap,route:Map<string,number>, currentCell:Cell, visited:Set<string>,collected: Map<string,Set<number>>, remaining:number, max:number,startCost:number, startCoords:Coord):Map<string,Set<number>> => {
+    if(remaining < 0){return collected}
+    const currentCost = max - remaining;
+    // console.log({currentCost,max,remaining});
+    const coords = coordToString(currentCell.coords)
+    // mark current cell as visited
+    // handle being back on an empty space
+    // if(route.has(coords) && route.get(coords)! - startCost - currentCost > 0){
+    //     if(coords === "7,3" && coordToString(startCoords) === "3,1"){ 
+    //         console.log('at the shortcut');
+    //         console.log({coords,startCoords, currentCost})
+    //     }
+    //     const endCost = route.get(coords)!
+    //     const savings =  endCost - startCost - currentCost;
+    //     const shortcutId = `${coordToString(startCoords)}-${coords}`;
+    //     const oldSavings = collected.get(shortcutId) || new Set;
+    //     oldSavings.add(savings);
+    //     collected.set(shortcutId, oldSavings);
+    //     return collected
+    // }
+    // if(remaining === 0){return collected}
+    // proces non-visited cells
+    visited.add(coords);
+    const nbors = currentCell.getNeighbors().filter(n=>isInBounds(n,map.cells));
+    for(const nbor of nbors){
+        console.log({at: coords, nbor});
+        const nborId = coordToString(nbor);
+        // check if neighbor is an ending
+    if(route.has(nborId)){
+        // console.log("Found shortcut");
+        if(nborId === "7,3" && coordToString(startCoords) === "3,1"){ 
+            console.log('at the shortcut');
+            console.log({coords,nborId,startCoords, currentCost})
+        }
+        const endCost = route.get(nborId)!
+        const savings =  endCost - startCost - currentCost - 1;
+        // console.log({savings});
+        const shortcutId = `${coordToString(startCoords)}-${nborId}`;
+        const oldSavings = collected.get(shortcutId) || new Set;
+        if(savings > 0){
+            oldSavings.add(savings);
+            collected.set(shortcutId, oldSavings);
+        }
+    }else{
+        // recurse on non-visited neighors
+        if(!visited.has(nborId)){
+            tryShortcuts(map,route,map.atCoords(nbor), visited ,collected,remaining - 1, max, startCost,startCoords);
+        }
+    }
+
+    }
+    return collected;
+    
+}
 /** Finds all potential shortcuts and their savings */
-const findShortcuts = (map:CellMap, routeMap:Map<string,number>):number[] =>{
-    const shortcutSavings = [];
+const findShortcuts = (map:CellMap, routeMap:Map<string,number>, nanoCount: number):number[] =>{
+
+        const shortcuts:Map<string,Set<number>> = new Map;
     for (const [coords,stepNumber] of routeMap){
         const asCoord = stringToCoords(coords);
         const asCell = map.atCoords(asCoord);
-        const neighborWalls = asCell.getNeighbors().filter(n=>isInBounds(n,map.cells) && map.atCoords(n).char === "#");
-        // check 1 away from each neighbor
-    const visited = new Set<string>;
-for (const firstNbor of neighborWalls){
-    visited.add(coordToString(firstNbor));
-    const firstCell = map.atCoords(firstNbor);
-    const nbors2 = firstCell.getNeighbors().filter(n=>isInBounds(n,map.cells) && !visited.has(coordToString(n)));
-    // check if any of these neighbors are viable shortcuts already
-    for(const secNbor of nbors2){
-    visited.add(coordToString(secNbor));
-            const secondCell = map.atCoords(secNbor);
-        if(routeMap.has(coordToString(secNbor))){
-            const stepsTwo = routeMap.get(coordToString(secNbor))!;
-            const savings = (stepsTwo - stepNumber) - 2;
-            if(savings > 0){
-                // console.log({secNbor,firstNbor, savings});
-                shortcutSavings.push(savings);
-            }
-        // }else{ // Check third neighbors here
-        //     const nbors3 = secondCell.getNeighbors().filter(n=> isInBounds(n,map.cells) && !visited.has(coordToString(n)));
-        //     for(const thirdNbor of nbors3){
-        // if(routeMap.has(coordToString(thirdNbor))){
-        //     const stepsThree = routeMap.get(coordToString(thirdNbor))!;
-        //     const savings = (stepsThree - stepNumber) - 3;
-        //     if(savings > 0){
-        //         // console.log({secNbor,firstNbor, savings});
-        //         shortcutSavings.push(savings);
-        //     }
-        //     }
-
-        // }
+        tryShortcuts(map,routeMap,asCell, new Set, shortcuts, nanoCount, nanoCount, stepNumber,asCoord);
     }
-}
-        // check 1 away from that to see if:
-        // 1) it is another wall
-        // 2) it is a cell along the route
-    }
-}
-    return shortcutSavings;
+        
+    console.log({shortcuts});
+    return [...shortcuts.values()].reduce((acc:number[],cv)=>{
+        acc = [...acc, ...cv.values()]
+        return acc;
+    },[])
 }
 
 const main = async () =>{
-    const input = await readInput("./inputs/20.txt");
+    const input = await readInput("./inputs/20.test.txt");
     const map = parseMap(input);
     // const route = dfsRoute(map,new Set, [map.atCoords(map.startCoords), [map.startCoords]])
     const route = iterativeRoute(map);
     const rm = new Map(route.map((c,ri)=>{return [coordToString(c), ri] }));
-    const savings = findShortcuts(map,rm);
-    const p1 = savings.filter(s=>s>=100).length;
+    console.log({rm});
+    const savings = findShortcuts(map,rm,19)//.filter(s=>s >= 50);
+    // const p1 = savings.filter(s=>s>=50).length;
+    const p1 = savings.reduce((acc: {[key:number]: number},cv)=> {
+        acc[cv] = acc[cv] + 1 || 1;
+        return acc;
+    }, {})
     
     console.log({p1});
 }
