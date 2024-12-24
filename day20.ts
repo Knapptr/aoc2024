@@ -104,93 +104,89 @@ const stringToCoords=(coordString:string):Coord=>{
     return [y,x];
 }
 
-
-const tryShortcuts = (map:CellMap,route:Map<string,number>, currentCell:Cell, visited:Set<string>,collected: Map<string,Set<number>>, remaining:number, max:number,startCost:number, startCoords:Coord):Map<string,Set<number>> => {
-    if(remaining < 0){return collected}
-    const currentCost = max - remaining;
-    // console.log({currentCost,max,remaining});
-    const coords = coordToString(currentCell.coords)
-    // mark current cell as visited
-    // handle being back on an empty space
-    // if(route.has(coords) && route.get(coords)! - startCost - currentCost > 0){
-    //     if(coords === "7,3" && coordToString(startCoords) === "3,1"){ 
-    //         console.log('at the shortcut');
-    //         console.log({coords,startCoords, currentCost})
-    //     }
-    //     const endCost = route.get(coords)!
-    //     const savings =  endCost - startCost - currentCost;
-    //     const shortcutId = `${coordToString(startCoords)}-${coords}`;
-    //     const oldSavings = collected.get(shortcutId) || new Set;
-    //     oldSavings.add(savings);
-    //     collected.set(shortcutId, oldSavings);
-    //     return collected
-    // }
-    // if(remaining === 0){return collected}
-    // proces non-visited cells
-    visited.add(coords);
-    const nbors = currentCell.getNeighbors().filter(n=>isInBounds(n,map.cells));
-    for(const nbor of nbors){
-        console.log({at: coords, nbor});
-        const nborId = coordToString(nbor);
-        // check if neighbor is an ending
-    if(route.has(nborId)){
-        // console.log("Found shortcut");
-        if(nborId === "7,3" && coordToString(startCoords) === "3,1"){ 
-            console.log('at the shortcut');
-            console.log({coords,nborId,startCoords, currentCost})
-        }
-        const endCost = route.get(nborId)!
-        const savings =  endCost - startCost - currentCost - 1;
-        // console.log({savings});
-        const shortcutId = `${coordToString(startCoords)}-${nborId}`;
-        const oldSavings = collected.get(shortcutId) || new Set;
-        if(savings > 0){
-            oldSavings.add(savings);
-            collected.set(shortcutId, oldSavings);
-        }
-    }else{
-        // recurse on non-visited neighors
-        if(!visited.has(nborId)){
-            tryShortcuts(map,route,map.atCoords(nbor), visited ,collected,remaining - 1, max, startCost,startCoords);
+const manhattanDistance = (lhs:Coord, rhs:Coord):number =>{
+    return Math.abs(lhs[0] - rhs[0]) + Math.abs(lhs[1] - rhs[1]);
+}
+const tryShortcuts = (map:CellMap, routeMap:Map<string,number>,count:number,threshold:number = 1):number[]=>{
+    const shortcuts = [];
+    const rm = [...routeMap];
+    while(rm.length > 0){
+        let [currentStep, stepCount] = rm.shift()!;
+        const currentCoord = stringToCoords(currentStep);
+        for(const [testCoordString,testStep] of rm.slice(threshold )){
+            const testCoord = stringToCoords(testCoordString);
+            const distance = manhattanDistance(currentCoord,testCoord);
+            if(distance <= count){
+                const saved = testStep - stepCount - distance;
+                if(saved >= threshold){
+                shortcuts.push(saved);
+                }
+            }
         }
     }
+    return shortcuts
 
-    }
-    return collected;
-    
+}
+
+
+/* Abandoned. Why doesn't this work!?
+// const tryShortcuts = (map:CellMap, routeMap:Map<string,number>, count: number):number[]=> {
+//     const shortcuts = new Map<string,number>;
+//     for(const [step,startCount] of routeMap){
+//         const [startY, startX] = stringToCoords(step);
+//         // check all ending locations from Count down to 1
+//         for (let max = count; max > 0; max -- ){
+//             for(let offset = count - max; offset >= 0; offset --){
+
+//                 console.log({max,offset});
+//                 const potentialCoords:Coord[] = [
+//                     [startY + max - offset, startX + offset],
+//                     [startY - max + offset, startX - offset],
+//                     [startY  - offset, startX - max],
+//                     [startY  + offset, startX + max],
+//                 ]
+//                 for(const testCoord of potentialCoords){
+//                     // check if it is in the route
+//                     const testId = coordToString(testCoord);
+//                     if(routeMap.has(testId)){
+//                         // check if it is actually a savings
+//                         const endCost = routeMap.get(testId)!;
+//                         const saved = endCost - startCount - max - offset 
+//                         const shortcutId = `${stringToCoords(step)}-${testId}`;
+//                         if(saved > 0){
+//                             console.log("Shortcut from: ", [startY,startX], "TO:", testId);
+//                             const updatedSavings = shortcuts.get(shortcutId) || 0;
+//                             shortcuts.set(shortcutId, Math.max(saved,updatedSavings));
+//                         }
+
+//                     }
+
+//                 }
+
+//             }
+//             }
+//     }
+
+    return [...shortcuts.values()];
 }
 /** Finds all potential shortcuts and their savings */
-const findShortcuts = (map:CellMap, routeMap:Map<string,number>, nanoCount: number):number[] =>{
+const findShortcuts = (map:CellMap, routeMap:Map<string,number>, nanoCount: number,threshold?: number):number[] =>{
 
-        const shortcuts:Map<string,Set<number>> = new Map;
-    for (const [coords,stepNumber] of routeMap){
-        const asCoord = stringToCoords(coords);
-        const asCell = map.atCoords(asCoord);
-        tryShortcuts(map,routeMap,asCell, new Set, shortcuts, nanoCount, nanoCount, stepNumber,asCoord);
-    }
+        const shortcuts = tryShortcuts(map,routeMap,nanoCount,threshold);
         
-    console.log({shortcuts});
-    return [...shortcuts.values()].reduce((acc:number[],cv)=>{
-        acc = [...acc, ...cv.values()]
-        return acc;
-    },[])
+    return shortcuts
 }
 
 const main = async () =>{
-    const input = await readInput("./inputs/20.test.txt");
+    const input = await readInput("./inputs/20.txt");
     const map = parseMap(input);
     // const route = dfsRoute(map,new Set, [map.atCoords(map.startCoords), [map.startCoords]])
     const route = iterativeRoute(map);
     const rm = new Map(route.map((c,ri)=>{return [coordToString(c), ri] }));
-    console.log({rm});
-    const savings = findShortcuts(map,rm,19)//.filter(s=>s >= 50);
+    const p2 = findShortcuts(map,rm,20,100)//.filter(s=>s >= 50);
     // const p1 = savings.filter(s=>s>=50).length;
-    const p1 = savings.reduce((acc: {[key:number]: number},cv)=> {
-        acc[cv] = acc[cv] + 1 || 1;
-        return acc;
-    }, {})
     
-    console.log({p1});
+    console.log(p2.length);
 }
 
 main();
